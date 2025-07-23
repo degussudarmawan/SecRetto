@@ -9,7 +9,7 @@ export const ProfileForm: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState(user?.username);
-  const [email, setEmail] = useState("user@example.com");
+  const [email, setEmail] = useState(user?.email);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +28,8 @@ export const ProfileForm: React.FC = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Edit Profile</h1>
 
       <form onSubmit={handleSave} className="space-y-8">
-        {/* Profile Picture Section */}
         <div className="flex items-center gap-6">
           <div className="w-24 h-24 bg-gray-300 rounded-full flex-shrink-0">
-            {/* In a real app, you'd render an <Image> here */}
           </div>
           <div className="flex-grow">
             <h2 className="text-lg font-semibold">Profile Picture</h2>
@@ -44,7 +42,6 @@ export const ProfileForm: React.FC = () => {
           </div>
         </div>
 
-        {/* User Details Section */}
         <div className="space-y-4">
           <div>
             <label
@@ -72,13 +69,12 @@ export const ProfileForm: React.FC = () => {
               id="email"
               type="email"
               value={email}
-              disabled // Email is typically not editable
+              disabled
               className="bg-gray-200 cursor-not-allowed"
             />
           </div>
         </div>
 
-        {/* Save Button */}
         <div className="flex justify-end">
           <Button type="submit" disabled={isLoading} className="w-auto px-6">
             {isLoading ? "Saving..." : "Save Changes"}

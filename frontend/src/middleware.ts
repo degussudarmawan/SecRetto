@@ -20,7 +20,6 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith("/signup");
   const isSetupPage = request.nextUrl.pathname.startsWith("/signup/setup");
 
-  // 1. Verify the token first
   let payload = null;
   if (token && jwtSecret) {
     payload = await verifyToken(token, jwtSecret);
@@ -28,6 +27,7 @@ export async function middleware(request: NextRequest) {
 
   const isAuthenticated = !!payload;
   const isProfileComplete = payload?.profileComplete === true;
+  const isUnlocked = payload?.isUnlocked === true;
 
   // --- LOGIC FOR UNAUTHENTICATED USERS ---
   if (!isAuthenticated) {
@@ -44,22 +44,29 @@ export async function middleware(request: NextRequest) {
 
   // --- LOGIC FOR AUTHENTICATED USERS ---
   if (isAuthenticated) {
-    // If their profile is not complete, they must be on the setup page
     if (!isProfileComplete) {
       if (isSetupPage) {
-        return NextResponse.next(); // Allow access
+        return NextResponse.next();
       }
-      // If they are anywhere else, force them to the setup page
       return NextResponse.redirect(new URL("/profile/setup", request.url));
     }
 
-    // If their profile IS complete, they should not be on auth or setup pages
-    if (isAuthPage || isSetupPage) {
-      return NextResponse.redirect(new URL("/chat", request.url));
+    if (!isProfileComplete) {
+      if (isSetupPage) return NextResponse.next();
+      return NextResponse.redirect(new URL("/profile/setup", request.url));
+    } else if (isProfileComplete && !isUnlocked) {
+      if (request.nextUrl.pathname.startsWith("/signup/unlock"))
+        return NextResponse.next();
+      return NextResponse.redirect(new URL("/signup/unlock", request.url));
+    }
+
+    if (isProfileComplete && isUnlocked) {
+      if (isAuthPage || isSetupPage) {
+        return NextResponse.redirect(new URL("/chat", request.url));
+      }
     }
   }
 
-  // If none of the above, allow the request to proceed
   return NextResponse.next();
 }
 

@@ -2,24 +2,22 @@
 import React from "react";
 import { Input } from "./Input";
 import { Button } from "./Button";
+import { IMessage, useChats } from "@/context/ChatContext";
+import { useAuth } from "@/context/AuthContext";
 
 const cn = (...classes: (string | undefined | null | false)[]): string => {
   return classes.filter(Boolean).join(" ");
 };
 
-export type Message = {
-  id: number;
-  text: string;
-  time: string;
-  sender: "me" | "other";
-};
-
 type MessageBubbleProps = {
-  message: Message;
+  message: IMessage;
+  children?: React.ReactNode;
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
-  const isSentByMe = message.sender === "me";
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, children }) => {
+  const { user } = useAuth();
+  const { selectedChat } = useChats();
+  const isSentByMe = message.sender === (user?._id as String);
 
   return (
     <div
@@ -28,12 +26,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         isSentByMe ? "justify-end" : "justify-start"
       )}
     >
-      {/* Avatar for received messages */}
       {!isSentByMe && (
         <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
       )}
-
-      {/* Message bubble */}
       <div
         className={cn(
           "p-3 rounded-lg max-w-md",
@@ -42,18 +37,28 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             : "bg-gray-100 text-gray-800 rounded-bl-none"
         )}
       >
-        <p>{message.text}</p>
+        <p className={cn("text-bold", isSentByMe ? "text-right" : "text-left")}>
+          {
+            selectedChat?.participants.find((p) => p._id === message.sender)
+              ?.username
+          }
+        </p>
+        <p>{message.content}</p>
+        {children}
         <span
           className={cn(
-            "text-xs block text-right mt-1",
-            isSentByMe ? "text-rose-200" : "text-gray-400"
+            "text-xs block mt-1",
+            isSentByMe ? "text-rose-200 text-right" : "text-gray-400 text-left"
           )}
         >
-          {message.time}
+          {new Date(message.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </span>
       </div>
     </div>
   );
 };
 
-export { MessageBubble}
+export { MessageBubble };

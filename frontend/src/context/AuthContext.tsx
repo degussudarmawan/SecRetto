@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useSocket } from "./SocketContext";
 
 // Define the shape of the user object
 interface IUser {
@@ -26,6 +27,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<IUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { socket } = useSocket();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -47,6 +49,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (socket && user) {
+      socket.emit("register", user._id);
+    }
+  }, [socket, user]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading }}>

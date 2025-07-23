@@ -15,15 +15,17 @@ const StyledSelect = ({
   placeholder,
   options,
   disabled,
+  onValueChange,
 }: {
   placeholder: string;
   options: FriendOption[];
   disabled?: boolean;
+  onValueChange: (code: string) => void;
 }) => (
-  <Select.Root disabled={disabled}>
+  <Select.Root disabled={disabled} onValueChange={onValueChange}>
     <Select.Trigger
       className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-rose-400 
-            data-[placeholder]:text-gray-500 text-black" // FIX: Added `text-black` to ensure selected value has good contrast.
+            data-[placeholder]:text-gray-500 text-black"
     >
       <Select.Value placeholder={placeholder} />
       <Select.Icon className="text-gray-500">
@@ -32,9 +34,9 @@ const StyledSelect = ({
     </Select.Trigger>
     <Select.Portal>
       <Select.Content
-        position="popper" // FIX: Using 'popper' position strategy for better alignment.
+        position="popper"
         sideOffset={5}
-        className="bg-white rounded-lg shadow-lg border border-gray-200 z-50 w-[var(--radix-select-trigger-width)]" // FIX: This class now works correctly with the popper position.
+        className="bg-white rounded-lg shadow-lg border border-gray-200 z-50 w-[var(--radix-select-trigger-width)]"
       >
         <Select.Viewport className="p-2">
           {options.map((option) => (

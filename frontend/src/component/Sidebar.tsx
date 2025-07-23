@@ -1,4 +1,4 @@
-"use client"; // This component uses state and event handlers
+"use client";
 
 import React, { useState } from "react";
 import {
@@ -13,6 +13,7 @@ import Link from "next/link";
 import { SidebarItem } from "./SidebarItem";
 import { Input } from "./Input";
 import { useAuth } from "@/context/AuthContext";
+import { IChat, useChats } from "@/context/ChatContext";
 
 const cn = (...classes: (string | undefined | null | false)[]): string => {
   return classes.filter(Boolean).join(" ");
@@ -41,12 +42,11 @@ const placeholder: Chat[] = [
 const Sidebar: React.FC<{
   onAddFriendClick: () => void;
   onStartSessionClick: () => void;
-  onChatClick: (chat: Chat) => void;
+  onChatClick: (chat: IChat) => void;
 }> = ({ onAddFriendClick, onStartSessionClick, onChatClick }) => {
-  // const [contacts, setContacts] = useState<Chat[]>(placeholder);
   const { user, isLoading } = useAuth();
-  const [contacts, setContacts] = useState<Chat[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { chats, isLoadingChat: chatsLoading } = useChats();
 
   const handleLogout = async () => {
     try {
@@ -105,17 +105,25 @@ const Sidebar: React.FC<{
         <Input placeholder="Search Chats..." className="pl-10 !py-2" />
       </div>
       <div className="flex-grow overflow-y-auto -mr-2 pr-2">
-        {contacts.length > 0 ? (
+        {chatsLoading ? (
+          <div className="space-y-2 mt-4">
+            <div className="h-16 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-16 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        ) : chats.length > 0 ? (
           <div className="space-y-2">
-            {contacts.map((contact, index) => (
-              <div key={contact.id} onClick={() => onChatClick(contact)}>
-                <SidebarItem
-                  name={contact.name}
-                  message={contact.message}
-                  time={contact.time}
-                  isLocked={contact.hasPassword}
-                />
-              </div>
+            {chats.map((chat) => (
+              <SidebarItem
+                key={chat._id.toString()}
+                name={chat.name || "Chat"}
+                message={"No messages yet..."}
+                time={new Date(chat.updatedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                isLocked={chat.hasPassword}
+                onClickItem={() => onChatClick(chat)}
+              />
             ))}
           </div>
         ) : (

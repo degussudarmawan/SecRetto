@@ -11,6 +11,7 @@ type SidebarItemProps = {
   time: string;
   active?: boolean;
   isLocked?: boolean;
+  onClickItem: () => void;
 };
 
 const SidebarItem: React.FC<SidebarItemProps> = ({
@@ -19,12 +20,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   time,
   active = false,
   isLocked = false,
+  onClickItem,
 }) => (
   <div
     className={cn(
       "flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-200",
       active ? "bg-rose-200" : "hover:bg-rose-100"
     )}
+    onClick={onClickItem}
   >
     <div className="w-10 h-10 bg-gray-300 rounded-full flex-shrink-0 mr-3"></div>
     <div className="flex-grow overflow-hidden">

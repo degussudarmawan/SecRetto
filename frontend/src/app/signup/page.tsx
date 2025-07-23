@@ -25,7 +25,7 @@ export default function SignUpPage() {
       if (data.isNewUser) {
         router.push("/signup/setup");
       } else {
-        router.push("/chat");
+        router.push("/signup/unlock");
       }
     } catch (error: any) {
       console.error("Sign up failed:", error);
