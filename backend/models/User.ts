@@ -35,7 +35,6 @@ const userSchema: Schema<IUser> = new Schema(
       },
     ],
     isProfileComplete: {
-      // NEW
       type: Boolean,
       default: false,
     },

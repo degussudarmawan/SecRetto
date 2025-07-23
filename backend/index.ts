@@ -9,6 +9,11 @@ import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import User, { IUser } from "./models/User";
 import { ObjectId } from "mongodb";
+import Chat from "./models/Chat";
+import bcrypt from "bcrypt";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 dotenv.config();
 
@@ -48,10 +53,73 @@ mongoose
   .then(() => console.log("Successfully connected to MongoDB Atlas!"))
   .catch((err) => console.error("Error connecting to MongoDB:", err));
 
+const userSocketMap = new Map<string, string>();
+
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Create a unique filename
+    cb(null, `${Date.now()}-${file.originalname}.encrypted`);
+  },
+});
+const upload = multer({ storage });
+
+// Set up Socket.IO connection handler
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
+
+  socket.on("register", (userId: string) => {
+    userSocketMap.set(userId, socket.id);
+    console.log(`User ${userId} registered with socket ${socket.id}`);
+  });
+
+  socket.on("send_message", async ({ chatId, senderId, content }) => {
+    try {
+      const chat = await Chat.findById(chatId);
+      if (!chat) return;
+
+      const newMessage = {
+        sender: senderId,
+        content: content, // In a real E2EE app, this would already be encrypted
+        timestamp: new Date(),
+      };
+
+      chat.messages.push(newMessage);
+      await chat.save();
+
+      const savedMessage = chat.messages[chat.messages.length - 1];
+
+      // Broadcast the new message to all participants in the chat
+      chat.participants.forEach((participantId) => {
+        if (participantId.toString() !== senderId) {
+          const recipientSocketId = userSocketMap.get(participantId.toString());
+          if (recipientSocketId) {
+            io.to(recipientSocketId).emit("receive_message", {
+              chatId,
+              message: savedMessage, // Send the message with the _id
+            });
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error handling send_message:", error);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
+    for (let [userId, socketId] of userSocketMap.entries()) {
+      if (socketId === socket.id) {
+        userSocketMap.delete(userId);
+        break;
+      }
+    }
   });
 });
 
@@ -103,7 +171,11 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, profileComplete: user.isProfileComplete },
+      {
+        userId: user._id,
+        profileComplete: user.isProfileComplete,
+        isUnlocked: false,
+      },
       jwtSecret,
       { expiresIn: "1d" }
     );
@@ -148,7 +220,13 @@ app.post("/api/profile/setup", async (req: Request, res: Response) => {
     const decoded = jwt.verify(token, jwtSecret) as { userId: string };
     const userId = decoded.userId;
 
-    const { username } = req.body;
+    const { username, publicKey } = req.body;
+
+    if (!username || !publicKey) {
+      return res
+        .status(400)
+        .json({ message: "Username and public key are required." });
+    }
 
     // Check if the username is already taken by another user
     const usernameExists = await User.findOne({ username });
@@ -158,7 +236,7 @@ app.post("/api/profile/setup", async (req: Request, res: Response) => {
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { username, isProfileComplete: true },
+      { username, publicKey, isProfileComplete: true },
       { new: true }
     );
 
@@ -167,7 +245,7 @@ app.post("/api/profile/setup", async (req: Request, res: Response) => {
     }
 
     const newToken = jwt.sign(
-      { userId: user._id, profileComplete: true },
+      { userId: user._id, profileComplete: true, isUnlocked: true },
       jwtSecret,
       { expiresIn: "1d" }
     );
@@ -315,6 +393,300 @@ app.get("/api/friends", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get Friends Error:", error);
     res.status(500).json({ message: "Server error while fetching friends." });
+  }
+});
+
+app.post("/api/chats", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated." });
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error("JWT_SECRET not defined");
+
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+    const currentUserId = decoded.userId;
+
+    const { friendId, password, sessionName } = req.body;
+    if (!friendId) {
+      return res
+        .status(400)
+        .json({ message: "Friend ID is required to start a chat." });
+    }
+
+    // Create a participants array
+    const participants = [currentUserId, friendId];
+
+    let hashedPassword;
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(password, salt);
+    }
+
+    // Create the new chat session
+    const newChat = new Chat({
+      participants,
+      password: hashedPassword,
+      messages: [],
+      name: sessionName,
+    });
+
+    await newChat.save();
+
+    const chatWithParticipants = await Chat.findById(newChat._id).populate(
+      "participants",
+      "username _id"
+    );
+
+    console.log(
+      "[Backend] Sending new chat data in API response:",
+      chatWithParticipants
+    );
+
+    const otherParticipantSocketId = userSocketMap.get(friendId);
+    if (otherParticipantSocketId) {
+      io.to(otherParticipantSocketId).emit("new_chat", chatWithParticipants);
+    }
+
+    const sanitizedChats = {
+      _id: chatWithParticipants?._id,
+      participants: chatWithParticipants?.participants,
+      updatedAt: chatWithParticipants?.updatedAt,
+      messages: chatWithParticipants?.messages,
+      hasPassword: !!chatWithParticipants?.password,
+      name: chatWithParticipants?.name,
+    };
+
+    res
+      .status(201)
+      .json({ message: "Chat session created!", chat: sanitizedChats });
+  } catch (error) {
+    console.error("Create Chat Error:", error);
+    res.status(500).json({ message: "Server error while creating chat." });
+  }
+});
+
+app.get("/api/chats", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) return res.status(401).json({ message: "Not authenticated." });
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error("JWT_SECRET not defined");
+
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+
+    const chats = await Chat.find({ participants: decoded.userId })
+      .populate("participants", "username")
+      .sort({ updatedAt: -1 });
+
+    const sanitizedChats = chats.map((chat) => ({
+      _id: chat._id,
+      participants: chat.participants,
+      updatedAt: chat.updatedAt,
+      messages: chat.messages,
+      hasPassword: !!chat.password,
+      name: chat.name,
+    }));
+
+    console.log(chats, "bruh", sanitizedChats);
+    res.status(200).json(sanitizedChats);
+  } catch (error) {
+    console.error("Get Chats Error:", error);
+    res.status(500).json({ message: "Server error while fetching chats." });
+  }
+});
+
+app.get("/api/chats/:chatId", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) return res.status(401).json({ message: "Not authenticated." });
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error("JWT_SECRET not defined");
+
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+    const { chatId } = req.params;
+
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: decoded.userId,
+    }).populate("participants", "username _id");
+
+    if (!chat) {
+      return res
+        .status(404)
+        .json({ message: "Chat not found or you are not a participant." });
+    }
+
+    res.status(200).json(chat);
+  } catch (error) {
+    res.status(500).json({ message: "Server error while fetching chat." });
+  }
+});
+
+// Endpoint to verify a chat's password
+app.post(
+  "/api/chats/:chatId/verify-password",
+  async (req: Request, res: Response) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token)
+        return res.status(401).json({ message: "Not authenticated." });
+
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) throw new Error("JWT_SECRET not defined");
+
+      const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+      const { chatId } = req.params;
+      const { password } = req.body;
+
+      const chat = await Chat.findOne({
+        _id: chatId,
+        participants: decoded.userId,
+      });
+
+      if (!chat) return res.status(404).json({ message: "Chat not found." });
+      if (!chat.password)
+        return res
+          .status(400)
+          .json({ message: "This chat is not password protected." });
+
+      const isMatch = await bcrypt.compare(password, chat.password);
+
+      if (isMatch) {
+        res.status(200).json({ message: "Password verified." });
+      } else {
+        res.status(401).json({ message: "Incorrect password." });
+      }
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Server error during password verification." });
+    }
+  }
+);
+
+app.get("/api/users/:userId/key", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) return res.status(401).json({ message: "Not authenticated." });
+
+    const user = await User.findById(req.params.userId).select("publicKey");
+
+    if (!user || !user.publicKey) {
+      return res.status(404).json({ message: "User or public key not found." });
+    }
+
+    res.status(200).json({ publicKey: user.publicKey });
+  } catch (error) {
+    console.error("Get Public Key Error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+app.post("/api/auth/unlock", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) return res.status(401).json({ message: "Not authenticated." });
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error("JWT_SECRET not defined");
+
+    const decoded = jwt.verify(token, jwtSecret) as {
+      userId: string;
+      profileComplete: boolean;
+    };
+
+    // Create a new, updated token that includes the 'isUnlocked' flag
+    const unlockedToken = jwt.sign(
+      { userId: decoded.userId, profileComplete: true, isUnlocked: true },
+      jwtSecret,
+      { expiresIn: "1d" } 
+    );
+
+    res.cookie("authToken", unlockedToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+    });
+
+    res.status(200).json({ message: "Keys unlocked successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error during unlock." });
+  }
+});
+
+app.post(
+  "/api/files/upload",
+  upload.single("file"),
+  (req: Request, res: Response) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token)
+        return res.status(401).json({ message: "Not authenticated." });
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded." });
+      }
+
+      // Return the unique ID (filename) of the stored file
+      res.status(201).json({
+        message: "File uploaded successfully.",
+        fileId: req.file.filename,
+      });
+    } catch (error) {
+      console.error("File Upload Error:", error);
+      res.status(500).json({ message: "Server error during file upload." });
+    }
+  }
+);
+
+app.post(
+  "/api/files/upload",
+  upload.single("file"),
+  (req: Request, res: Response) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token)
+        return res.status(401).json({ message: "Not authenticated." });
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded." });
+      }
+
+      // Return the unique ID (filename) of the stored file
+      res.status(201).json({
+        message: "File uploaded successfully.",
+        fileId: req.file.filename,
+      });
+    } catch (error) {
+      console.error("File Upload Error:", error);
+      res.status(500).json({ message: "Server error during file upload." });
+    }
+  }
+);
+
+app.get("/api/files/:fileId", (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.authToken;
+    if (!token) return res.status(401).json({ message: "Not authenticated." });
+
+    const { fileId } = req.params;
+
+    const filePath = path.join(__dirname, "..", "uploads", fileId);
+
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: "File not found." });
+    }
+  } catch (error) {
+    console.error("File Download Error:", error);
+    res.status(500).json({ message: "Server error during file download." });
   }
 });
 
