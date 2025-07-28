@@ -70,6 +70,32 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+const parseTimer = (timerString: string): Date | undefined => {
+  if (!timerString) return undefined;
+  const now = new Date();
+  const unit = timerString.slice(-1);
+  const value = parseInt(timerString.slice(0, -1));
+
+  if (isNaN(value)) return undefined;
+
+  switch (unit) {
+    case "s":
+      now.setSeconds(now.getSeconds() + value);
+      return now;
+    case "m":
+      now.setMinutes(now.getMinutes() + value);
+      return now;
+    case "h":
+      now.setHours(now.getHours() + value);
+      return now;
+    case "d":
+      now.setDate(now.getDate() + value);
+      return now;
+    default:
+      return undefined;
+  }
+};
+
 // Set up Socket.IO connection handler
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
@@ -79,15 +105,16 @@ io.on("connection", (socket) => {
     console.log(`User ${userId} registered with socket ${socket.id}`);
   });
 
-  socket.on("send_message", async ({ chatId, senderId, content }) => {
+  socket.on("send_message", async ({ chatId, senderId, content, nonce }) => {
     try {
       const chat = await Chat.findById(chatId);
       if (!chat) return;
 
       const newMessage = {
         sender: senderId,
-        content: content, // In a real E2EE app, this would already be encrypted
+        content: content,
         timestamp: new Date(),
+        nonce: nonce,
       };
 
       chat.messages.push(newMessage);
@@ -102,7 +129,7 @@ io.on("connection", (socket) => {
           if (recipientSocketId) {
             io.to(recipientSocketId).emit("receive_message", {
               chatId,
-              message: savedMessage, // Send the message with the _id
+              message: savedMessage,
             });
           }
         }
@@ -121,6 +148,35 @@ io.on("connection", (socket) => {
       }
     }
   });
+
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      // Find chats that have an expiration date in the past
+      const expiredChats = await Chat.find({
+        expiresAt: { $ne: null, $lte: now },
+      });
+
+      for (const chat of expiredChats) {
+        console.log(
+          `Chat ${chat._id} has expired. Notifying participants and deleting.`
+        );
+
+        // Notify all participants that the chat is being aborted
+        chat.participants.forEach((participantId) => {
+          const socketId = userSocketMap.get(participantId.toString());
+          if (socketId) {
+            io.to(socketId).emit("chat_aborted", { chatId: chat._id });
+          }
+        });
+
+        // Delete the chat from the database
+        await Chat.findByIdAndDelete(chat._id);
+      }
+    } catch (error) {
+      console.error("Error in expired chat cleanup job:", error);
+    }
+  }, 60000);
 });
 
 app.get("/", (req: Request, res: Response) => {
@@ -409,7 +465,7 @@ app.post("/api/chats", async (req: Request, res: Response) => {
     const decoded = jwt.verify(token, jwtSecret) as { userId: string };
     const currentUserId = decoded.userId;
 
-    const { friendId, password, sessionName } = req.body;
+    const { friendId, password, sessionName, timer } = req.body;
     if (!friendId) {
       return res
         .status(400)
@@ -425,12 +481,15 @@ app.post("/api/chats", async (req: Request, res: Response) => {
       hashedPassword = await bcrypt.hash(password, salt);
     }
 
+    const expiresAt = parseTimer(timer);
+
     // Create the new chat session
     const newChat = new Chat({
       participants,
       password: hashedPassword,
       messages: [],
       name: sessionName,
+      expiresAt: expiresAt,
     });
 
     await newChat.save();
@@ -604,7 +663,7 @@ app.post("/api/auth/unlock", async (req: Request, res: Response) => {
     const unlockedToken = jwt.sign(
       { userId: decoded.userId, profileComplete: true, isUnlocked: true },
       jwtSecret,
-      { expiresIn: "1d" } 
+      { expiresIn: "1d" }
     );
 
     res.cookie("authToken", unlockedToken, {
@@ -677,7 +736,7 @@ app.get("/api/files/:fileId", (req: Request, res: Response) => {
 
     const { fileId } = req.params;
 
-    const filePath = path.join(__dirname, "..", "uploads", fileId);
+    const filePath = path.resolve("uploads", fileId);
 
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);

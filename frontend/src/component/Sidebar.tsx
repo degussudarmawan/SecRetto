@@ -56,6 +56,7 @@ const Sidebar: React.FC<{
       });
 
       window.location.reload();
+      sessionStorage.removeItem("sessionPrivateKey");
     } catch (error) {
       console.error("Logout failed:", error);
     }

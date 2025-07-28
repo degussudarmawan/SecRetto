@@ -36,7 +36,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
         {isLocked && <Lock size={12} className="text-gray-500" />}
       </div>
       <p className="text-sm text-gray-500 truncate">
-        {isLocked ? "*************" : message}
+        {/* {isLocked ? "*************" : message} */}
+        ************
       </p>
     </div>
     <div className="text-xs text-gray-400 ml-2 flex-shrink-0">{time}</div>

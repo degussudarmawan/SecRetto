@@ -1,7 +1,5 @@
 "use client";
 import React from "react";
-import { Input } from "./Input";
-import { Button } from "./Button";
 import { IMessage, useChats } from "@/context/ChatContext";
 import { useAuth } from "@/context/AuthContext";
 
@@ -37,14 +35,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, children }) => {
             : "bg-gray-100 text-gray-800 rounded-bl-none"
         )}
       >
-        <p className={cn("text-bold", isSentByMe ? "text-right" : "text-left")}>
+        <p className={cn("font-bold", isSentByMe ? "text-right" : "text-left")}>
           {
             selectedChat?.participants.find((p) => p._id === message.sender)
               ?.username
           }
         </p>
-        <p>{message.content}</p>
-        {children}
+        <div className="flex-grow text-white-space-pre-wrap break-words">
+          {children}
+        </div>
         <span
           className={cn(
             "text-xs block mt-1",

@@ -24,7 +24,7 @@ export interface IChat {
   sessionName?: string;
   createdAt: string;
   updatedAt: string;
-  name: string
+  name: string;
 }
 interface IChatContext {
   chats: IChat[];
@@ -36,14 +36,14 @@ interface IChatContext {
 }
 
 const ChatContext = createContext<IChatContext>({
-    chats: [],
-    isLoadingChat: true,
-    addChat: () => { },
-    selectedChat: null,
-    setSelectedChat: () => { },
-    addMessageToChat: function (chatId: string, message: IMessage): void {
-        throw new Error("Function not implemented.");
-    }
+  chats: [],
+  isLoadingChat: true,
+  addChat: () => {},
+  selectedChat: null,
+  setSelectedChat: () => {},
+  addMessageToChat: function (chatId: string, message: IMessage): void {
+    throw new Error("Function not implemented.");
+  },
 });
 
 export const useChats = () => {
@@ -150,9 +150,40 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [socket, addMessageToChat]);
 
+  const removeChat = useCallback((chatId: string) => {
+    setChats((prevChats) => prevChats.filter((chat) => chat._id !== chatId));
+    // Also deselect the chat if it was the active one
+    setSelectedChat((prevSelected) =>
+      prevSelected?._id === chatId ? null : prevSelected
+    );
+  }, []);
+
+  // NEW: Listen for chat deletion events from the socket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatAborted = ({ chatId }: { chatId: string }) => {
+      console.log(`Chat ${chatId} was aborted from server.`);
+      removeChat(chatId);
+    };
+
+    socket.on("chat_aborted", handleChatAborted);
+
+    return () => {
+      socket.off("chat_aborted", handleChatAborted);
+    };
+  }, [socket, removeChat]);
+
   return (
     <ChatContext.Provider
-      value={{ chats, isLoadingChat, addChat, selectedChat, setSelectedChat, addMessageToChat }}
+      value={{
+        chats,
+        isLoadingChat,
+        addChat,
+        selectedChat,
+        setSelectedChat,
+        addMessageToChat,
+      }}
     >
       {children}
     </ChatContext.Provider>

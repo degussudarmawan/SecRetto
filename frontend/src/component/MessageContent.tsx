@@ -7,6 +7,10 @@ import { useChats, IMessage } from "@/context/ChatContext";
 import sodium from "libsodium-wrappers-sumo";
 import { Download, File as FileIcon, Loader2 } from "lucide-react";
 
+const cn = (...classes: (string | undefined | null | false)[]): string => {
+  return classes.filter(Boolean).join(" ");
+};
+
 interface FileInfo {
   type: "file";
   fileName: string;
@@ -15,59 +19,137 @@ interface FileInfo {
   nonce: string;
 }
 
-export const MessageContent: React.FC<{ message: IMessage }> = ({
-  message,
-}) => {
+export const MessageContent: React.FC<{
+  message: IMessage;
+  participantKeys: { [userId: string]: string };
+}> = ({ message, participantKeys }) => {
   const { user } = useAuth();
   const { privateKey } = useKeys();
   const { selectedChat } = useChats();
   const [isDownloading, setIsDownloading] = useState(false);
-
+  const isSentByMe = message.sender === (user?._id as String);
   const otherParticipant = selectedChat?.participants.find(
     (p) => p._id !== user?._id
   );
 
   const content = useMemo(() => {
-    if (message._id.includes("T")) return message.content;
+    if (message._id.includes("T")) return message.content; // It's an optimistic message
     try {
       const parsed = JSON.parse(message.content);
       if (parsed && parsed.type === "file") {
         return parsed as FileInfo;
       }
-    } catch (e) {
-      // It's not a JSON object, so it must be a text message
-      console.log(message.nonce, privateKey);
-      if (!message.nonce || !privateKey)
-        return "⚠️ Keys missing, cannot decrypt.";
+    } catch (e) {}
 
-      const senderPublicKey = "REPLACE_WITH_SENDER_PUBLIC_KEY";
+    console.log(
+      message.nonce,
+      privateKey,
+      participantKeys,
+      message.sender,
+      participantKeys[message.sender]
+    );
+    if (!message.nonce || !privateKey)
+      return "⚠️ Keys missing, cannot decrypt.";
 
-      try {
-        return sodium.crypto_box_open_easy(
-          sodium.from_base64(message.content),
-          sodium.from_base64(message.nonce),
-          sodium.from_base64(senderPublicKey),
-          sodium.from_base64(privateKey),
-          "text"
-        );
-      } catch (err) {
-        return "⚠️ Text decryption failed.";
-      }
+    let publicKeyToUse: string | null = null;
+
+    if (isSentByMe) {
+      publicKeyToUse = otherParticipant
+        ? participantKeys[otherParticipant._id]
+        : null;
+    } else {
+      publicKeyToUse = participantKeys[message.sender];
     }
-    return message.content;
-  }, [message, privateKey, otherParticipant]);
+
+    if (!publicKeyToUse) return "⚠️ Sender's key not available.";
+
+    try {
+      return sodium.crypto_box_open_easy(
+        sodium.from_base64(message.content),
+        sodium.from_base64(message.nonce),
+        sodium.from_base64(publicKeyToUse),
+        sodium.from_base64(privateKey),
+        "text"
+      );
+    } catch (err) {
+      console.log(err);
+      return "⚠️ Text decryption failed.";
+    }
+  }, [message, privateKey, participantKeys]);
 
   const handleFileDownload = async (fileInfo: FileInfo) => {
-    // draft
+    if (!privateKey || !otherParticipant) return;
+    setIsDownloading(true);
+
+    try {
+      let publicKeyToUse: string | null = null;
+
+      if (isSentByMe) {
+        publicKeyToUse = otherParticipant
+          ? participantKeys[otherParticipant._id]
+          : null;
+      } else {
+        publicKeyToUse = participantKeys[message.sender];
+      }
+
+      if (!publicKeyToUse) return "⚠️ Sender's key not available.";
+      if (!publicKeyToUse)
+        throw new Error("Could not find sender's public key.");
+
+      const fileKeyData = JSON.parse(
+        sodium.crypto_box_open_easy(
+          sodium.from_base64(fileInfo.key),
+          sodium.from_base64(fileInfo.nonce),
+          sodium.from_base64(publicKeyToUse),
+          sodium.from_base64(privateKey),
+          "text"
+        )
+      );
+
+      const { key: fileKey, nonce: fileNonce } = fileKeyData;
+
+      const fileResponse = await fetch(
+        `http://localhost:3001/api/files/${fileInfo.fileId}`,
+        { credentials: "include" }
+      );
+      if (!fileResponse.ok) throw new Error("Could not download file.");
+      const encryptedFileBytes = await fileResponse.arrayBuffer();
+
+      const decryptedFile = sodium.crypto_secretbox_open_easy(
+        new Uint8Array(encryptedFileBytes),
+        sodium.from_base64(fileNonce),
+        sodium.from_base64(fileKey)
+      );
+
+      const blob = new Blob([decryptedFile], {
+        type: "application/octet-stream",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileInfo.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error("File download/decryption failed:", error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
-  if (typeof content === "object" && content.type === "file") {
-    // If the content is a FileInfo object, render the file UI
+  if (
+    typeof content === "object" &&
+    content !== null &&
+    content.type === "file"
+  ) {
     return (
-      <div className="flex items-center gap-3">
-        <FileIcon className="text-current opacity-75" />
-        <div className="flex-grow">
-          <p className="font-semibold text-sm">{content.fileName}</p>
+      <div className="flex items-center gap-3 p-3">
+        <FileIcon className="text-current opacity-75 flex-shrink-0" />
+        <div className="flex-grow min-w-0">
+          <p className="font-semibold text-sm truncate">{content.fileName}</p>
           <button
             onClick={() => handleFileDownload(content)}
             disabled={isDownloading}
@@ -75,13 +157,11 @@ export const MessageContent: React.FC<{ message: IMessage }> = ({
           >
             {isDownloading ? (
               <>
-                <Loader2 size={12} className="animate-spin" />
-                Decrypting...
+                <Loader2 size={12} className="animate-spin" /> Decrypting...
               </>
             ) : (
               <>
-                <Download size={12} />
-                Download
+                <Download size={12} /> Download
               </>
             )}
           </button>
@@ -90,5 +170,9 @@ export const MessageContent: React.FC<{ message: IMessage }> = ({
     );
   }
 
-  return <p>{content as string}</p>;
+  return (
+    <p className={cn("text-bold", isSentByMe ? "text-right" : "text-left")}>
+      {String(content)}
+    </p>
+  );
 };

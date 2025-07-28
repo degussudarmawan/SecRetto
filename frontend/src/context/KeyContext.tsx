@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import _sodium from "libsodium-wrappers-sumo";
 
 interface IKeysContext {
@@ -22,6 +22,13 @@ export const useKeys = () => {
 export const KeyProvider = ({ children }: { children: React.ReactNode }) => {
   const [privateKey, setPrivateKey] = useState<string | null>(null);
 
+  useEffect(() => {
+    const sessionKey = sessionStorage.getItem("sessionPrivateKey");
+    if (sessionKey) {
+      setPrivateKey(sessionKey);
+    }
+  }, []);
+
   const unlock = useCallback(async (password: string): Promise<boolean> => {
     const encryptedKey = localStorage.getItem("encryptedPrivateKey");
     const nonce = localStorage.getItem("privateKeyNonce");
@@ -34,7 +41,7 @@ export const KeyProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       await _sodium.ready;
-      const sodium = _sodium
+      const sodium = _sodium;
       const encryptionKey = sodium.crypto_pwhash(
         32,
         password,
@@ -53,6 +60,7 @@ export const KeyProvider = ({ children }: { children: React.ReactNode }) => {
       );
 
       setPrivateKey(decryptedKey);
+      sessionStorage.setItem("sessionPrivateKey", decryptedKey);
       return true;
     } catch (error) {
       console.error("Decryption failed, likely incorrect password:", error);
