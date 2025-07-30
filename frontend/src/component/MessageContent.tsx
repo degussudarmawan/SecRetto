@@ -27,7 +27,7 @@ export const MessageContent: React.FC<{
   const { privateKey } = useKeys();
   const { selectedChat } = useChats();
   const [isDownloading, setIsDownloading] = useState(false);
-  const isSentByMe = message.sender === (user?._id as String);
+  const isSentByMe = message.sender === (user?._id as string);
   const otherParticipant = selectedChat?.participants.find(
     (p) => p._id !== user?._id
   );

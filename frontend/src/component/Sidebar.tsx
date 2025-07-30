@@ -131,7 +131,7 @@ const Sidebar: React.FC<{
           <div className="text-center text-gray-500 mt-10 p-4">
             <p className="font-semibold">No Chats Yet</p>
             <p className="text-sm mt-1">
-              Click the '+' icon to start a new secret chat.
+              Click the &ldquo;+&ldquo; icon to start a new secret chat.
             </p>
           </div>
         )}

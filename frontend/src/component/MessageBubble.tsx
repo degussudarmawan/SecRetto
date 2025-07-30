@@ -15,7 +15,7 @@ type MessageBubbleProps = {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, children }) => {
   const { user } = useAuth();
   const { selectedChat } = useChats();
-  const isSentByMe = message.sender === (user?._id as String);
+  const isSentByMe = message.sender === (user?._id as string);
 
   return (
     <div
