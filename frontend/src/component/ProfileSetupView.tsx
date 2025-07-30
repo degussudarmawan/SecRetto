@@ -96,9 +96,8 @@ function ProfileSetupView() {
       localStorage.setItem("privateKeyNonce", nonce);
       localStorage.setItem("privateKeySalt", salt);
 
-      router.push("/chat");
-
       await unlock(masterPassword);
+      router.push("/chat");
     } catch (err: any) {
       setError(err.message);
     } finally {
