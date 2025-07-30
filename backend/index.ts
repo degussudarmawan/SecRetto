@@ -242,7 +242,7 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
     res.cookie("authToken", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
     });
@@ -311,7 +311,7 @@ app.post("/api/profile/setup", async (req: Request, res: Response) => {
     res.cookie("authToken", newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
     });
@@ -330,7 +330,7 @@ app.post("/api/logout", (req: Request, res: Response) => {
   res.cookie("authToken", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "none",
     path: "/",
     maxAge: 0,
   });
@@ -671,7 +671,7 @@ app.post("/api/auth/unlock", async (req: Request, res: Response) => {
     res.cookie("authToken", unlockedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       path: "/",
     });
 
