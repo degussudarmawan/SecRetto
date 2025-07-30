@@ -58,9 +58,8 @@ const ChatLayoutContent = ({ children }: { children: React.ReactNode }) => {
 
       setSelectedChat(chatToUnlock);
       setChatToUnlock(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      alert(error.message);
     }
   };
 
