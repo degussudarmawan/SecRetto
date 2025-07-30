@@ -1,12 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Input } from "./Input";
-import { Button } from "./Button";
-import { useRouter } from "next/navigation";
 import { GoogleButton } from "./GoogleButton";
 import { useGoogleLogin } from "@react-oauth/google";
-import LoadingOverlay from "./LoadingOverlay";
 import { useLoading } from "@/context/LoadingContext";
 
 type SignUpFormProps = {
@@ -44,7 +40,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSubmit }) => {
         >
           <GoogleButton />
           <span className="text-sm font-medium text-gray-700">
-            "Sign in with Google"
+            &ldquo;Sign in with Google&ldquo;
           </span>
         </button>
 

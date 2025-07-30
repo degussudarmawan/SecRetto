@@ -28,7 +28,7 @@ export const ChatPasswordModal: React.FC<ChatPasswordModalProps> = ({
       <div className="text-center">
         <h2 className="text-2xl text-black font-bold mb-2">Enter Password</h2>
         <p className="text-gray-500 mb-6">
-          This chat is locked. Please enter the password for "{chatName}".
+          This chat is locked. Please enter the password for &ldquo;{chatName}&ldquo;.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
