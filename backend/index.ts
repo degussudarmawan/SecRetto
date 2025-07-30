@@ -26,7 +26,7 @@ const client = new OAuth2Client(
   "postmessage"
 );
 
-const frontendURL = "https://secretto-sand.vercel.app/";
+const frontendURL = "https://secretto-sand.vercel.app";
 
 app.use(
   cors({
