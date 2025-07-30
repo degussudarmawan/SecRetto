@@ -109,7 +109,7 @@ export const MessageContent: React.FC<{
       const { key: fileKey, nonce: fileNonce } = fileKeyData;
 
       const fileResponse = await fetch(
-        `http://localhost:3001/api/files/${fileInfo.fileId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/files/${fileInfo.fileId}`,
         { credentials: "include" }
       );
       if (!fileResponse.ok) throw new Error("Could not download file.");

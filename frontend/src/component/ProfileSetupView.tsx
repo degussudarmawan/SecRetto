@@ -77,12 +77,15 @@ function ProfileSetupView() {
         "base64"
       );
 
-      const response = await fetch("http://localhost:3001/api/profile/setup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, publicKey: keyPair.publicKey }),
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/profile/setup`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, publicKey: keyPair.publicKey }),
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
       if (!response.ok) {

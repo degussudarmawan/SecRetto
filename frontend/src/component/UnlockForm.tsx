@@ -25,10 +25,13 @@ export const UnlockForm: React.FC = () => {
         throw new Error("Incorrect master password. Please try again.");
       }
 
-      const response = await fetch("http://localhost:3001/api/auth/unlock", {
-        method: "POST",
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/unlock`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to create an unlocked session.");

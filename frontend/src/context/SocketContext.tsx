@@ -17,7 +17,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:3001");
+    const newSocket = io("${process.env.NEXT_PUBLIC_API_URL}");
 
     newSocket.on("connect", () => {
       console.log("Successfully connected via SocketContext!", newSocket.id);

@@ -32,9 +32,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch("http://localhost:3001/api/users/me", {
-          credentials: "include",
-        });
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/users/me`,
+          {
+            credentials: "include",
+          }
+        );
 
         if (response.ok) {
           const userData = await response.json();

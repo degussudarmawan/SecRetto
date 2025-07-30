@@ -42,7 +42,7 @@ const ChatLayoutContent = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/api/chats/${chatToUnlock._id}/verify-password`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats/${chatToUnlock._id}/verify-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

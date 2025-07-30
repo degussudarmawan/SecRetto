@@ -24,12 +24,18 @@ const AddFriendModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setMessage({ type: "", text: "" });
 
     try {
-      const response = await fetch("http://localhost:3001/api/friends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ friendEmail: email, friendUsername: username }),
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/friends`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            friendEmail: email,
+            friendUsername: username,
+          }),
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
 

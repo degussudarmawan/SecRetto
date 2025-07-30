@@ -73,8 +73,8 @@ export const ChatView: React.FC<{ onMenuClick?: () => void }> = ({
 
   useEffect(() => {
     if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [newMessage]);
 
@@ -92,7 +92,7 @@ export const ChatView: React.FC<{ onMenuClick?: () => void }> = ({
         async (p: { _id: any }) => {
           try {
             const response = await fetch(
-              `http://localhost:3001/api/users/${p._id}/key`,
+              `${process.env.NEXT_PUBLIC_API_URL}/api/users/${p._id}/key`,
               {
                 credentials: "include",
               }

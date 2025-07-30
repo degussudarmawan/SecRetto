@@ -43,17 +43,20 @@ const StartSessionModal: React.FC<{
 
     console.log("yoo!!!");
     try {
-      const response = await fetch("http://localhost:3001/api/chats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          friendId: selectedFriend,
-          password: password,
-          sessionName: sessionName,
-          timer,
-        }),
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            friendId: selectedFriend,
+            password: password,
+            sessionName: sessionName,
+            timer,
+          }),
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
 

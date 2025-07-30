@@ -60,9 +60,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchChats = useCallback(async () => {
     setIsLoadingChat(true);
     try {
-      const response = await fetch("http://localhost:3001/api/chats", {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats`,
+        {
+          credentials: "include",
+        }
+      );
       if (response.ok) {
         const chatData = await response.json();
         setChats(chatData);

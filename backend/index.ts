@@ -26,9 +26,11 @@ const client = new OAuth2Client(
   "postmessage"
 );
 
+const frontendURL = "https://secretto-sand.vercel.app/";
+
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: frontendURL,
     credentials: true,
   })
 );
@@ -37,7 +39,7 @@ app.use(cookieParser());
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: frontendURL,
     methods: ["GET", "POST"],
   },
 });

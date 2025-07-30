@@ -50,7 +50,7 @@ const Sidebar: React.FC<{
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:3001/api/logout", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/logout`, {
         method: "POST",
         credentials: "include",
       });

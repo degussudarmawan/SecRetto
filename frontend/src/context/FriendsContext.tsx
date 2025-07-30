@@ -41,9 +41,12 @@ export const FriendsProvider = ({
   const fetchFriends = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:3001/api/friends", {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/friends`,
+        {
+          credentials: "include",
+        }
+      );
 
       if (response.ok) {
         const friendsData = await response.json();
