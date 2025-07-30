@@ -228,6 +228,7 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
       throw new Error("JWT_SECRET is not defined in .env file");
     }
 
+    console.log("Railway signing with secret:", process.env.JWT_SECRET);
     const token = jwt.sign(
       {
         userId: user._id,

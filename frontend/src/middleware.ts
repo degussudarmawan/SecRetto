@@ -9,6 +9,7 @@ async function verifyToken(token: string, secret: string): Promise<any> {
     return payload;
   } catch (e) {
     console.error("Token verification failed:", e);
+    console.log("Token verification failed:", e)
     return null;
   }
 }
@@ -17,6 +18,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get("authToken")?.value;
   const jwtSecret = process.env.JWT_SECRET;
 
+  console.log("Vercel verifying with secret:", jwtSecret);
   const isAuthPage = request.nextUrl.pathname.startsWith("/signup");
   const isSetupPage = request.nextUrl.pathname.startsWith("/signup/setup");
 
