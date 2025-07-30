@@ -13,7 +13,7 @@ export default function SignUpPage() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        "${process.env.NEXT_PUBLIC_API_URL}/api/auth/google",
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
