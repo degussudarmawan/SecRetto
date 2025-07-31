@@ -73,8 +73,8 @@ export const ChatView: React.FC<{ onMenuClick?: () => void }> = ({
 
   useEffect(() => {
     if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [newMessage]);
 
@@ -180,6 +180,91 @@ export const ChatView: React.FC<{ onMenuClick?: () => void }> = ({
     }
   };
 
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !user || !otherParticipant || !socket) return;
+
+    const otherParticipantKey = participantKeys[otherParticipant._id];
+    if (!otherParticipantKey) {
+      alert("Cannot send file: recipient's key is not available.");
+      return;
+    }
+
+    try {
+      await _sodium.ready;
+      const sodium = _sodium;
+      if (!privateKey) throw new Error("Private key is missing.");
+
+      const fileBuffer = await file.arrayBuffer();
+      const fileBytes = new Uint8Array(fileBuffer);
+
+      const fileKey = sodium.crypto_secretbox_keygen("base64");
+      const fileNonce = sodium.randombytes_buf(
+        sodium.crypto_secretbox_NONCEBYTES,
+        "base64"
+      );
+
+      const encryptedFile = sodium.crypto_secretbox_easy(
+        fileBytes,
+        sodium.from_base64(fileNonce),
+        sodium.from_base64(fileKey)
+      );
+
+      const keyNonce = sodium.randombytes_buf(
+        sodium.crypto_box_NONCEBYTES,
+        "base64"
+      );
+      const encryptedFileKey = sodium.crypto_box_easy(
+        JSON.stringify({ key: fileKey, nonce: fileNonce }),
+        sodium.from_base64(keyNonce),
+        sodium.from_base64(otherParticipantKey),
+        sodium.from_base64(privateKey),
+        "base64"
+      );
+
+      const formData = new FormData();
+      formData.append("file", new Blob([encryptedFile]));
+
+      const uploadResponse = await fetch(
+        "http://localhost:3001/api/files/upload",
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        }
+      );
+      const uploadData = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(uploadData.message);
+
+      const messageData = {
+        chatId: selectedChat?._id,
+        senderId: user._id,
+        content: JSON.stringify({
+          type: "file",
+          fileName: file.name,
+          fileId: uploadData.fileId,
+          key: encryptedFileKey,
+          nonce: keyNonce,
+        }),
+        isFileInfo: true,
+        nonce: fileNonce
+      };
+      socket.emit("send_message", messageData);
+
+      addMessageToChat(selectedChat?._id as string, {
+        _id: new Date().toISOString(),
+        sender: user._id,
+        content: `${file.name}`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("File encryption or upload failed:", error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
   if (selectedChat === null) {
     return <EmptyChatView />;
   }
@@ -241,9 +326,7 @@ export const ChatView: React.FC<{ onMenuClick?: () => void }> = ({
             <input
               type="file"
               ref={fileInputRef}
-              onChange={() => {
-                /* handleFileUpload */
-              }}
+              onChange={handleFileUpload}
               style={{ display: "none" }}
             />
             <button

@@ -158,7 +158,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }, []);
 
-  // NEW: Listen for chat deletion events from the socket
   useEffect(() => {
     if (!socket) return;
 
